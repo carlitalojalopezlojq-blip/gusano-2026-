@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#070b16">
+<title>🐛 Gusanito 2026</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{
+    height:100%;overflow:hidden;background:#070b16;color:#fff;
+    font-family:system-ui,-apple-system,sans-serif;
+    user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+    touch-action:none;overscroll-behavior:none;
+  }
+  #game{position:fixed;inset:0;display:block;touch-action:none}
+
+  .overlay{
+    position:fixed;inset:0;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;padding:24px;
+    background:radial-gradient(circle at 50% 30%,#16224a 0%,#070b16 75%);
+    z-index:10;text-align:center;
+  }
+  .overlay.active{display:flex;animation:fade .22s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+
+  h1{
+    font-size:clamp(2.2rem,10vw,3.8rem);font-weight:900;line-height:1;letter-spacing:.02em;
+    background:linear-gradient(180deg,#7bffcf 0%,#2ed573 45%,#0a8a3f 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 6px 24px rgba(46,213,115,.5));
+  }
+  .sub{color:#8ec5ff;font-size:.8rem;letter-spacing:.3em;font-weight:700;margin-top:-8px}
+
+  .killer-line{
+    color:#aab5d0;font-size:1.05rem;font-weight:600;
+    padding:8px 20px;border-radius:12px;
+    background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);
+  }
+  .killer-line b{font-weight:900}
+
+  .btn{
+    padding:15px 40px;min-width:220px;border:none;border-radius:16px;cursor:pointer;
+    font-family:inherit;font-size:1.02rem;font-weight:800;letter-spacing:.08em;
+    background:linear-gradient(180deg,#5ee87f,#25a850);color:#04220f;
+    box-shadow:0 5px 0 #0e5c2a,0 12px 30px rgba(37,168,80,.45);
+    transition:transform .06s,box-shadow .06s;touch-action:manipulation;
+  }
+  .btn:active{transform:translateY(5px);box-shadow:0 0 0 #0e5c2a,0 4px 12px rgba(37,168,80,.3)}
+  .btn.alt{
+    background:linear-gradient(180deg,#4a5d8c,#2a3555);color:#dbe6ff;
+    box-shadow:0 5px 0 #131a2e,0 12px 30px rgba(0,0,0,.5);
+  }
+  .btn.alt:active{box-shadow:0 0 0 #131a2e}
+
+  .stats{display:flex;gap:30px;justify-content:center;margin:6px 0}
+  .stat{display:flex;flex-direction:column;gap:3px}
+  .stat span:first-child{font-size:.65rem;color:#8ec5ff;letter-spacing:.18em;font-weight:700}
+  .stat span:last-child{font-size:1.9rem;font-weight:900;color:#fff}
+
+  .tips{color:#aab5d0;font-size:.85rem;max-width:340px;line-height:1.6}
+  .tips b{color:#7bed9f}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;font-size:.9rem;color:#c2d3f5;margin-top:6px}
+
+  #btn-exit-spec{
+    position:fixed;top:14px;right:14px;
+    padding:12px 20px;border-radius:12px;
+    background:rgba(255,60,60,0.85);color:#fff;border:none;
+    font-family:inherit;font-weight:800;font-size:.9rem;letter-spacing:.06em;
+    cursor:pointer;z-index:20;display:none;
+    box-shadow:0 4px 14px rgba(255,60,60,0.5);
+    touch-action:manipulation;
+  }
+  #btn-exit-spec:active{transform:scale(.94)}
+  #spectator-badge{
+    position:fixed;top:14px;left:14px;
+    padding:10px 16px;border-radius:12px;
+    background:rgba(0,0,0,0.6);border:1px solid rgba(120,170,255,0.4);
+    color:#8ec5ff;font-weight:800;font-size:.8rem;letter-spacing:.14em;
+    z-index:20;display:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="spectator-badge">👁 ESPECTADOR · arrastra para mover</div>
+<button id="btn-exit-spec">✕ SALIR</button>
+
+<div class="overlay active" id="ov-menu">
+  <h1>GUSANITO</h1>
+  <div class="sub">MUNDO ABIERTO · 2026</div>
+  <p class="tips">Come orbes, crece y devora.<br><b>100 gusanos</b> luchan por el trono. Algunos ya son enormes…</p>
+  <button class="btn" id="btn-play">▶ JUGAR</button>
+  <div class="legend">
+    <span>🟢 +5 pts</span>
+    <span>📏 Crece</span>
+    <span>⚡ Turbo gasta tamaño</span>
+  </div>
+  <p class="tips" style="font-size:.75rem;color:#6b7ba0">Arrastra el dedo para girar · TURBO abajo-derecha</p>
+</div>
+
+<div class="overlay" id="ov-dead">
+  <h1 style="background:linear-gradient(180deg,#ff9b9b,#c92a2a);-webkit-background-clip:text;background-clip:text;color:transparent">¡TE DEVORARON!</h1>
+  <p class="killer-line" id="killer-line">Te comió <b>alguien</b></p>
+  <div class="stats">
+    <div class="stat"><span>PUNTOS</span><span id="final-score">0</span></div>
+    <div class="stat"><span>LONGITUD</span><span id="final-length">0</span></div>
+  </div>
+  <button class="btn" id="btn-restart">↻ JUGAR OTRA VEZ</button>
+  <button class="btn alt" id="btn-spectate">👁 ESPECTAR EL MUNDO</button>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+const WORLD_W = 6000, WORLD_H = 6000;
+const BOT_COUNT = 99;
+const FOOD_COUNT = 1500;
+const GRID_CELL = 150;
+const TURN_RATE = 14;
+const BASE_SPEED = 220;
+const MAX_PARTICLES = 380;
+const MAX_FOOD_PER_DEATH = 40;
+const BOOST_ZOOM = 0.86;
+
+const WORM_COLORS = [
+  '#ff4757','#ff6b81','#ffa502','#ffdd59','#7bed9f','#2ed573',
+  '#1e90ff','#45aaf2','#a55eea','#8854d0','#fd79a8','#e84393',
+  '#00d2d3','#48dbfb','#feca57','#ff9ff3','#ff6348','#eccc68'
+];
+const FOOD_COLORS = [
+  '#ff6b6b','#ffd93d','#6bcB77','#4d96ff',
+  '#f0a8ff','#ff9f43','#00d2d3','#ff6bcb','#a0ffd0'
+];
+const BOT_NAMES = [
+  'Neón','Rayo','Víbora','Dragón','Tornado','Cometa','Fuego','Hielo',
+  'Sombra','Chispa','Trueno','Furia','Espectro','Nova','Titán','Pulso',
+  'Veneno','Zenith','Apolo','Kraken','Fénix','Ónix','Lobo','Cobra',
+  'Sable','Bruma','Filo','Furia','Cero','Prisma','Vórtice','Caos'
+];
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', {alpha: false});
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  canvas.width  = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  camera.baseZoom = Math.min(w, h) / 620;
+  if (!camera.zoom || camera.zoom < 0.1) camera.zoom = camera.baseZoom;
+  boostBtn.x = w - 88;
+  boostBtn.y = h - 100;
+  vignette = null;
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+if (!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
+    if (typeof r === 'number') r = {tl:r,tr:r,br:r,bl:r};
+    this.beginPath();
+    this.moveTo(x+r.tl, y);
+    this.arcTo(x+w,y,x+w,y+h,r.tr);
+    this.arcTo(x+w,y+h,x,y+h,r.br);
+    this.arcTo(x,y+h,x,y,r.bl);
+    this.arcTo(x,y,x+w,y,r.tl);
+    this.closePath();
+    return this;
+  };
+}
+
+const rand = (a,b) => a + Math.random()*(b-a);
+const clamp = (v,a,b) => v<a?a:v>b?b:v;
+const lerp = (a,b,t) => a+(b-a)*t;
+const dist2 = (x1,y1,x2,y2) => { const dx=x2-x1, dy=y2-y1; return dx*dx+dy*dy; };
+
+function shade(hex, pct){
+  const n = parseInt(hex.slice(1), 16);
+  const a = Math.round(2.55*pct);
+  const r = clamp((n>>16)+a, 0, 255);
+  const g = clamp(((n>>8)&0xFF)+a, 0, 255);
+  const b = clamp((n&0xFF)+a, 0, 255);
+  return '#' + ((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+let actx = null;
+let droneOsc = null, droneGain = null, droneOsc2 = null, droneGain2 = null;
+
+function initAudio(){
+  if (actx) return;
+  try { actx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
+}
+
+function startDrone(){
+  if (!actx || droneOsc) return;
+  try {
+    droneOsc = actx.createOscillator();
+    droneGain = actx.createGain();
+    droneOsc.type = 'sine';
+    droneOsc.frequency.value = 52;
+    droneGain.gain.value = 0.012;
+    droneOsc.connect(droneGain);
+    droneGain.connect(actx.destination);
+    droneOsc.start();
+
+    droneOsc2 = actx.createOscillator();
+    droneGain2 = actx.createGain();
+    droneOsc2.type = 'triangle';
+    droneOsc2.frequency.value = 78.5;
+    droneGain2.gain.value = 0.005;
+    droneOsc2.connect(droneGain2);
+    droneGain2.connect(actx.destination);
+    droneOsc2.start();
+  } catch(e){}
+}
+
+function beep(freq, dur, vol=0.05, type='sine', slideTo=null){
+  if (!actx || actx.state !== 'running') return;
+  try {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, actx.currentTime+dur);
+    g.gain.setValueAtTime(vol, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime+dur);
+  } catch(e){}
+}
+
+const foodSpriteCache = new Map();
+function getFoodSprite(color){
+  if (foodSpriteCache.has(color)) return foodSpriteCache.get(color);
+  const size = 48;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const g2 = c.getContext('2d');
+  const g = g2.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.15, color);
+  g.addColorStop(0.42, color + 'cc');
+  g.addColorStop(0.72, color + '33');
+  g.addColorStop(1, color + '00');
+  g2.fillStyle = g;
+  g2.fillRect(0, 0, size, size);
+  foodSpriteCache.set(color, c);
+  return c;
+}
+FOOD_COLORS.forEach(getFoodSprite);
+WORM_COLORS.forEach(getFoodSprite);
+
+const camera = { x: WORLD_W/2, y: WORLD_H/2, zoom: 1, baseZoom: 1 };
+const boostBtn = { x: 0, y: 0, r: 70 };
+const spectatorPos = { x: WORLD_W/2, y: WORLD_H/2 };
+
+let worms = [], foods = [], particles = [];
+let player = null;
+let foodGrid = new Map();
+let gameState = 'menu';
+let lastTime = 0, shakeTime = 0;
+let vignette = null;
+
+const steerTouches = new Set();
+const boostTouches = new Set();
+const spectatorDrag = new Map();
+
+const cellKey = (x,y) => ((x/GRID_CELL)|0) + ',' + ((y/GRID_CELL)|0);
+
+function spawnFood(x, y, color){
+  const f = {
+    x: clamp(x, 25, WORLD_W-25),
+    y: clamp(y, 25, WORLD_H-25),
+    color: color || FOOD_COLORS[(Math.random()*FOOD_COLORS.length)|0],
+    r: rand(3.5, 6.5),
+    phase: Math.random()*Math.PI*2
+  };
+  foods.push(f);
+  const k = cellKey(f.x, f.y);
+  let arr = foodGrid.get(k);
+  if (!arr){ arr = []; foodGrid.set(k, arr); }
+  arr.push(f);
+  return f;
+}
+
+class Worm {
+  constructor(x, y, isPlayer, startLength){
+    this.x = x; this.y = y;
+    this.angle = Math.random()*Math.PI*2;
+    this.targetAngle = this.angle;
+    this.baseRadius = 9;
+    this.radius = this.baseRadius;
+    this.isPlayer = isPlayer;
+    this.color = isPlayer ? '#7bff9f' : WORM_COLORS[(Math.random()*WORM_COLORS.length)|0];
+    this.darkColor = shade(this.color, -50);
+    this.lightColor = shade(this.color, 30);
+    this.alive = true;
+    this.score = 0;
+    this.boosting = false;
+    this._wasBoosting = false;
+    this.boostAccum = 0;
+    this.name = isPlayer ? 'TÚ' : BOT_NAMES[(Math.random()*BOT_NAMES.length)|0] + ((Math.random()*90+10)|0);
+    this.aiTimer = 0;
+    this.blinkTimer = rand(2, 5);
+    this.killerName = null;
+    this.killerColor = null;
+
+    const L = startLength || 15;
+    const sp = this.baseRadius * 0.7;
+    this.segments = new Array(L);
+    for (let i = 0; i < L; i++){
+      this.segments[i] = {
+        x: x - Math.cos(this.angle)*i*sp,
+        y: y - Math.sin(this.angle)*i*sp
+      };
+    }
+    this._recalcRadius();
+  }
+
+  _recalcRadius(){
+    this.radius = Math.min(26, this.baseRadius + Math.sqrt(this.segments.length) * 0.62);
+  }
+
+  get speed(){ return BASE_SPEED * (this.boosting ? 1.85 : 1); }
+  get spacing(){ return this.radius * 0.7; }
+
+  update(dt){
+    let d = this.targetAngle - this.angle;
+    while (d > Math.PI)  d -= Math.PI*2;
+    while (d < -Math.PI) d += Math.PI*2;
+    const maxTurn = TURN_RATE * dt;
+    this.angle += clamp(d, -maxTurn, maxTurn);
+
+    this.blinkTimer -= dt;
+    if (this.blinkTimer < -0.15) this.blinkTimer = rand(2.5, 6);
+
+    if (this.isPlayer){
+      if (this.boosting && !this._wasBoosting){
+        this._wasBoosting = true;
+        beep(180, 0.22, 0.035, 'sawtooth', 420);
+        if (droneOsc) try { droneOsc.frequency.setTargetAtTime(70, actx.currentTime, 0.15); } catch(e){}
+      } else if (!this.boosting && this._wasBoosting){
+        this._wasBoosting = false;
+        if (droneOsc) try { droneOsc.frequency.setTargetAtTime(52, actx.currentTime, 0.3); } catch(e){}
+      }
+    }
+
+    if (this.boosting && this.segments.length > 15){
+      this.boostAccum += dt;
+      while (this.boostAccum > 0.055){
+        this.boostAccum -= 0.055;
+        this.segments.pop();
+        this._recalcRadius();
+        const tail = this.segments[this.segments.length-1];
+        if (tail && Math.random() < 0.35){
+          spawnFood(tail.x + rand(-4,4), tail.y + rand(-4,4), this.color);
+        }
+      }
+      if (Math.random() < 0.8 && particles.length < MAX_PARTICLES){
+        const tail = this.segments[this.segments.length-1];
+        if (tail){
+          particles.push({
+            x: tail.x + rand(-3,3), y: tail.y + rand(-3,3),
+            vx: rand(-40,40), vy: rand(-40,40),
+            life: 0.28, max: 0.28, r: rand(1.5,3.5), color: this.color
+          });
+        }
+      }
+    }
+
+    const sp = this.speed;
+    this.x += Math.cos(this.angle) * sp * dt;
+    this.y += Math.sin(this.angle) * sp * dt;
+
+    const m = 40;
+    if (this.x < m) this.x = m;
+    if (this.x > WORLD_W - m) this.x = WORLD_W - m;
+    if (this.y < m) this.y = m;
+    if (this.y > WORLD_H - m) this.y = WORLD_H - m;
+
+    let px = this.x, py = this.y;
+    const gap = this.spacing, gapSq = gap*gap;
+    const segs = this.segments;
+    for (let i = 0; i < segs.length; i++){
+      const s = segs[i];
+      const dx = s.x - px, dy = s.y - py;
+      const dSq = dx*dx + dy*dy;
+      if (dSq > gapSq){
+        const dd = Math.sqrt(dSq);
+        const r = gap / dd;
+        s.x = px + dx*r;
+        s.y = py + dy*r;
+      }
+      px = s.x; py = s.y;
+    }
+  }
+
+  grow(n){
+    const last = this.segments[this.segments.length-1];
+    for (let i = 0; i < n; i++){
+      this.segments.push({x: last.x, y: last.y});
+    }
+    this._recalcRadius();
+  }
+
+  die(){
+    this.alive = false;
+    const step = Math.max(1, Math.floor(this.segments.length / MAX_FOOD_PER_DEATH));
+    for (let i = 0; i < this.segments.length; i += step){
+      const s = this.segments[i];
+      const fx = s.x + rand(-10,10), fy = s.y + rand(-10,10);
+      if (fx > 30 && fx < WORLD_W-30 && fy > 30 && fy < WORLD_H-30){
+        spawnFood(fx, fy, this.color);
+      }
+    }
+    if (particles.length < MAX_PARTICLES - 20){
+      for (let i = 0; i < 18; i++){
+        const a = Math.random()*Math.PI*2, s = rand(60,300);
+        particles.push({
+          x: this.x, y: this.y,
+          vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+          life: 0.8, max: 0.8, r: rand(2,5), color: this.color
+        });
+      }
+    }
+    if (!this.isPlayer && player && player.alive){
+      const dd = dist2(this.x, this.y, player.x, player.y);
+      if (dd < 800*800){
+        beep(rand(380, 520), 0.08, 0.022, 'square');
+      }
+    }
+  }
+
+  draw(near){
+    const segs = this.segments;
+    if (segs.length < 2) return;
+
+    const path = new Path2D();
+    path.moveTo(this.x, this.y);
+    for (let i = 0; i < segs.length; i++) path.lineTo(segs[i].x, segs[i].y);
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (near){
+      ctx.save();
+      ctx.translate(3, 5);
+      ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+      ctx.lineWidth = this.radius * 2;
+      ctx.stroke(path);
+      ctx.restore();
+
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = this.radius * 2.7;
+      ctx.stroke(path);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.strokeStyle = this.darkColor;
+    ctx.lineWidth = this.radius * 2 + 3;
+    ctx.stroke(path);
+
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = this.radius * 2;
+    ctx.stroke(path);
+
+    if (near){
+      ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+      ctx.lineWidth = this.radius * 0.55;
+      ctx.stroke(path);
+    }
+
+    const hx = this.x, hy = this.y, hr = this.radius * 1.06;
+    ctx.fillStyle = this.lightColor;
+    ctx.beginPath();
+    ctx.arc(hx, hy, hr, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = this.darkColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const eOff = this.radius * 0.46;
+    const eR = this.radius * 0.34;
+    const px = Math.cos(this.angle + Math.PI/2);
+    const py = Math.sin(this.angle + Math.PI/2);
+    const lookOff = this.radius * 0.28;
+    const lx = Math.cos(this.angle) * lookOff;
+    const ly = Math.sin(this.angle) * lookOff;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(hx + px*eOff, hy + py*eOff, eR, 0, Math.PI*2);
+    ctx.arc(hx - px*eOff, hy - py*eOff, eR, 0, Math.PI*2);
+    ctx.fill();
+
+    if (this.blinkTimer < 0){
+      ctx.fillStyle = this.lightColor;
+      ctx.beginPath();
+      ctx.arc(hx + px*eOff, hy + py*eOff, eR*1.05, 0, Math.PI*2);
+      ctx.arc(hx - px*eOff, hy - py*eOff, eR*1.05, 0, Math.PI*2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#050a08';
+      ctx.beginPath();
+      ctx.arc(hx + px*eOff + lx*0.5, hy + py*eOff + ly*0.5, eR*0.55, 0, Math.PI*2);
+      ctx.arc(hx - px*eOff + lx*0.5, hy - py*eOff + ly*0.5, eR*0.55, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.beginPath();
+      ctx.arc(hx + px*eOff + lx*0.5 - eR*0.18, hy + py*eOff + ly*0.5 - eR*0.18, eR*0.2, 0, Math.PI*2);
+      ctx.arc(hx - px*eOff + lx*0.5 - eR*0.18, hy - py*eOff + ly*0.5 - eR*0.18, eR*0.2, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    if (near && !this.isPlayer){
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = 'bold 11px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(this.name, hx, hy - hr - 8);
+      ctx.textAlign = 'left';
+    }
+  }
+}
+
+function updateAI(w, dt){
+  w.aiTimer -= dt;
+  if (w.aiTimer > 0) return;
+  w.aiTimer = 0.22 + Math.random()*0.5;
+
+  let best = null, bestD = 380;
+  const cx = (w.x/GRID_CELL)|0, cy = (w.y/GRID_CELL)|0;
+  for (let dx=-2; dx<=2; dx++){
+    for (let dy=-2; dy<=2; dy++){
+      const cell = foodGrid.get((cx+dx)+','+(cy+dy));
+      if (!cell) continue;
+      for (let i = 0; i < cell.length; i++){
+        const f = cell[i];
+        const d = dist2(w.x, w.y, f.x, f.y);
+        if (d < bestD){ bestD = d; best = f; }
+      }
+    }
+  }
+
+  let danger = null;
+  const aheadX = w.x + Math.cos(w.angle)*100;
+  const aheadY = w.y + Math.sin(w.angle)*100;
+  for (let i = 0; i < worms.length; i++){
+    const o = worms[i];
+    if (o === w || !o.alive) continue;
+    if (dist2(w.x, w.y, o.x, o.y) > 62500) continue;
+    for (let j = 0; j < o.segments.length; j += 4){
+      const s = o.segments[j];
+      if (dist2(aheadX, aheadY, s.x, s.y) < 3025){
+        danger = Math.atan2(w.y - s.y, w.x - s.x);
+        break;
+      }
+    }
+    if (danger !== null) break;
+  }
+
+  if (danger !== null)     w.targetAngle = danger;
+  else if (best !== null)  w.targetAngle = Math.atan2(best.y - w.y, best.x - w.x);
+  else                     w.targetAngle += rand(-0.6, 0.6);
+
+  const m = 320;
+  if (w.x < m && Math.cos(w.targetAngle) < 0)          w.targetAngle = 0;
+  if (w.x > WORLD_W-m && Math.cos(w.targetAngle) > 0)  w.targetAngle = Math.PI;
+  if (w.y < m && Math.sin(w.targetAngle) < 0)          w.targetAngle = Math.PI/2;
+  if (w.y > WORLD_H-m && Math.sin(w.targetAngle) > 0)  w.targetAngle = -Math.PI/2;
+
+  w.boosting = Math.random() < 0.01 && w.segments.length > 25;
+}
+
+function update(dt){
+  for (let i = particles.length - 1; i >= 0; i--){
+    const p = particles[i];
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.vx *= 0.93; p.vy *= 0.93;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i,1);
+  }
+  if (shakeTime > 0) shakeTime = Math.max(0, shakeTime - dt);
+
+  const targetZoomBase = (player && player.alive && player.boosting) ? camera.baseZoom * BOOST_ZOOM : camera.baseZoom;
+  const zt = 1 - Math.pow(0.004, dt);
+  camera.zoom = lerp(camera.zoom, targetZoomBase, zt);
+
+  if (gameState === 'menu' || gameState === 'dead') return;
+
+  for (let i = 0; i < worms.length; i++){
+    const w = worms[i];
+    if (!w.alive) continue;
+    if (!w.isPlayer) updateAI(w, dt);
+    w.update(dt);
+  }
+
+  const bodyGrid = new Map();
+  for (let i = 0; i < worms.length; i++){
+    const w = worms[i];
+    if (!w.alive) continue;
+    for (let j = 0; j < w.segments.length; j += 3){
+      const s = w.segments[j];
+      const k = cellKey(s.x, s.y);
+      let arr = bodyGrid.get(k);
+      if (!arr){ arr = []; bodyGrid.set(k, arr); }
+      arr.push({w: w, s: s});
+    }
+  }
+
+  for (let i = 0; i < worms.length; i++){
+    const w = worms[i];
+    if (!w.alive) continue;
+    const cx = (w.x/GRID_CELL)|0, cy = (w.y/GRID_CELL)|0;
+    const r = w.radius + 14, rSq = r*r;
+    for (let dx=-1; dx<=1; dx++){
+      for (let dy=-1; dy<=1; dy++){
+        const cell = foodGrid.get((cx+dx)+','+(cy+dy));
+        if (!cell) continue;
+        for (let j = cell.length-1; j >= 0; j--){
+          const f = cell[j];
+          if (dist2(f.x, f.y, w.x, w.y) < rSq){
+            cell.splice(j,1);
+            const fi = foods.indexOf(f);
+            if (fi >= 0) foods.splice(fi,1);
+            w.grow(1);
+            w.score += 5;
+            if (w.isPlayer){
+              beep(720, 0.04, 0.025, 'square');
+              beep(980, 0.05, 0.018, 'square');
+            }
+            if (particles.length < MAX_PARTICLES - 4){
+              for (let k = 0; k < 3; k++){
+                const a = Math.random()*Math.PI*2, sp = rand(30,110);
+                particles.push({
+                  x: f.x, y: f.y,
+                  vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+                  life: 0.35, max: 0.35, r: rand(1.5,2.5), color: f.color
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < worms.length; i++){
+    const w = worms[i];
+    if (!w.alive) continue;
+    const cx = (w.x/GRID_CELL)|0, cy = (w.y/GRID_CELL)|0;
+    const rCol = w.radius + 3;
+    let killer = null;
+    outer:
+    for (let dx=-1; dx<=1 && !killer; dx++){
+      for (let dy=-1; dy<=1 && !killer; dy++){
+        const cell = bodyGrid.get((cx+dx)+','+(cy+dy));
+        if (!cell) continue;
+        for (let j = 0; j < cell.length; j++){
+          const it = cell[j];
+          if (it.w === w || !it.w.alive) continue;
+          const rr = rCol + it.w.radius * 0.8;
+          if (dist2(w.x, w.y, it.s.x, it.s.y) < rr*rr){
+            killer = it.w;
+            break outer;
+          }
+        }
+      }
+    }
+    if (killer){
+      w.die();
+      if (w === player){
+        gameState = 'dead';
+        player.killerName = killer.name;
+        player.killerColor = killer.color;
+        shakeTime = 0.5;
+        beep(180, 0.4, 0.1, 'sawtooth');
+        if (droneOsc) try { droneOsc.frequency.setTargetAtTime(40, actx.currentTime, 0.5); } catch(e){}
+        setTimeout(showDeathScreen, 500);
+      }
+    }
+  }
+
+  let playerX = player && player.alive ? player.x : camera.x;
+  let playerY = player && player.alive ? player.y : camera.y;
+  for (let i = worms.length - 1; i >= 0; i--){
+    if (!worms[i].alive && !worms[i].isPlayer){
+      worms.splice(i,1);
+      const ang = Math.random()*Math.PI*2;
+      const d = rand(600, 2400);
+      const bx = clamp(playerX + Math.cos(ang)*d, 100, WORLD_W-100);
+      const by = clamp(playerY + Math.sin(ang)*d, 100, WORLD_H-100);
+      worms.push(createBot(bx, by));
+    }
+  }
+
+  while (foods.length < FOOD_COUNT){
+    spawnFood(rand(50, WORLD_W-50), rand(50, WORLD_H-50));
+  }
+
+  if (gameState === 'spectator'){
+    camera.x = lerp(camera.x, spectatorPos.x, 0.4);
+    camera.y = lerp(camera.y, spectatorPos.y, 0.4);
+  } else if (player && player.alive){
+    const t = 1 - Math.pow(0.001, dt);
+    camera.x = lerp(camera.x, player.x, t);
+    camera.y = lerp(camera.y, player.y, t);
+  }
+}
+
+function createBot(x, y){
+  const roll = Math.random();
+  let startLen;
+  if (roll < 0.42)      startLen = 8  + (Math.random()*14|0);
+  else if (roll < 0.72) startLen = 24 + (Math.random()*24|0);
+  else if (roll < 0.92) startLen = 52 + (Math.random()*42|0);
+  else                  startLen = 100 + (Math.random()*80|0);
+  return new Worm(x, y, false, startLen);
+}
+
+function render(){
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+
+  ctx.fillStyle = '#0a0e1a';
+  ctx.fillRect(0, 0, w, h);
+
+  let sx = 0, sy = 0;
+  if (shakeTime > 0){
+    const m = shakeTime * 30;
+    sx = (Math.random()-0.5)*m;
+    sy = (Math.random()-0.5)*m;
+  }
+
+  ctx.save();
+  ctx.translate(w/2 + sx, h/2 + sy);
+  ctx.scale(camera.zoom, camera.zoom);
+  ctx.translate(-camera.x, -camera.y);
+
+  const halfW = w/2/camera.zoom, halfH = h/2/camera.zoom;
+  const vx = camera.x - halfW, vy = camera.y - halfH;
+  const vw = halfW*2, vh = halfH*2;
+
+  const gs = 100;
+  ctx.strokeStyle = 'rgba(80,140,220,0.07)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const gx0 = Math.floor(vx/gs)*gs, gy0 = Math.floor(vy/gs)*gs;
+  for (let x = gx0; x < vx+vw+gs; x += gs){
+    ctx.moveTo(x, vy); ctx.lineTo(x, vy+vh);
+  }
+  for (let y = gy0; y < vy+vh+gs; y += gs){
+    ctx.moveTo(vx, y); ctx.lineTo(vx+vw, y);
+  }
+  ctx.stroke();
+
+  if (vx < 0 || vy < 0 || vx+vw > WORLD_W || vy+vh > WORLD_H){
+    ctx.strokeStyle = 'rgba(255,80,80,0.5)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
+    ctx.strokeStyle = 'rgba(255,80,80,0.14)';
+    ctx.lineWidth = 24;
+    ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
+  }
+
+  const cx0 = Math.max(0, (vx/GRID_CELL)|0);
+  const cx1 = Math.min((WORLD_W/GRID_CELL)|0, ((vx+vw)/GRID_CELL|0) + 1);
+  const cy0 = Math.max(0, (vy/GRID_CELL)|0);
+  const cy1 = Math.min((WORLD_H/GRID_CELL)|0, ((vy+vh)/GRID_CELL|0) + 1);
+  const now = performance.now();
+
+  for (let cx = cx0; cx <= cx1; cx++){
+    for (let cy = cy0; cy <= cy1; cy++){
+      const cell = foodGrid.get(cx + ',' + cy);
+      if (!cell) continue;
+      for (let i = 0; i < cell.length; i++){
+        const f = cell[i];
+        if (f.x < vx-20 || f.x > vx+vw+20) continue;
+        if (f.y < vy-20 || f.y > vy+vh+20) continue;
+        const sprite = getFoodSprite(f.color);
+        const pulse = 1 + Math.sin(now*0.005 + f.phase)*0.18;
+        const size = f.r * 6 * pulse;
+        ctx.drawImage(sprite, f.x - size/2, f.y - size/2, size, size);
+      }
+    }
+  }
+
+  for (let i = 0; i < particles.length; i++){
+    const p = particles[i];
+    if (p.x < vx-15 || p.x > vx+vw+15) continue;
+    if (p.y < vy-15 || p.y > vy+vh+15) continue;
+    const a = clamp(p.life/p.max, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r*a, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  const wx = player && player.alive ? player.x : camera.x;
+  const wy = player && player.alive ? player.y : camera.y;
+  const toDraw = [];
+  for (let i = 0; i < worms.length; i++){
+    const wm = worms[i];
+    if (!wm.alive) continue;
+    const ddx = wm.x - camera.x, ddy = wm.y - camera.y;
+    const cull = Math.max(halfW, halfH) + 400 + wm.segments.length * 8;
+    if (ddx*ddx + ddy*ddy > cull*cull) continue;
+    if (wm.x < vx - 350 || wm.x > vx + vw + 350) continue;
+    if (wm.y < vy - 350 || wm.y > vy + vh + 350) continue;
+    const pd = player ? (wm.x - wx)*(wm.x - wx) + (wm.y - wy)*(wm.y - wy) : 0;
+    toDraw.push({wm: wm, near: pd < 900*900 || wm.isPlayer});
+  }
+  toDraw.sort((a, b) => {
+    if (a.wm.isPlayer) return 1;
+    if (b.wm.isPlayer) return -1;
+    return (a.wm.x - wx)*(a.wm.x - wx) + (a.wm.y - wy)*(a.wm.y - wy)
+         - (b.wm.x - wx)*(b.wm.x - wx) - (b.wm.y - wy)*(b.wm.y - wy);
+  });
+  for (let i = 0; i < toDraw.length; i++){
+    toDraw[i].wm.draw(toDraw[i].near);
+  }
+
+  ctx.restore();
+
+  drawVignette(w, h);
+  drawUI(w, h);
+}
+
+function drawVignette(w, h){
+  if (!vignette){
+    const g = ctx.createRadialGradient(w/2, h/2, Math.min(w,h)*0.28, w/2, h/2, Math.max(w,h)*0.75);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.42)');
+    vignette = g;
+  }
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawUI(w, h){
+  const inGame = (gameState === 'playing' || gameState === 'spectator');
+
+  if (inGame && player){
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(14, 14, 200, 66, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(120,170,255,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#8ec5ff';
+    ctx.font = 'bold 11px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText('PUNTOS', 30, 38);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 28px system-ui';
+    ctx.fillText(Math.floor(player.score), 30, 68);
+
+    ctx.fillStyle = '#7bed9f';
+    ctx.font = 'bold 12px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText('LONG ' + player.segments.length, 202, 68);
+    ctx.textAlign = 'left';
+  }
+
+  if (inGame){
+    const sorted = worms.filter(x => x.alive).sort((a,b) => b.segments.length - a.segments.length);
+    const top = sorted.slice(0, 5);
+    const bw = 175, bh = 30 + top.length*22;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(w - bw - 14, 14, bw, bh, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(120,170,255,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffd93b';
+    ctx.font = 'bold 11px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText('TOP 5', w - bw + 6, 34);
+
+    for (let i = 0; i < top.length; i++){
+      const wm = top[i];
+      const y = 56 + i*22;
+      ctx.fillStyle = i === 0 ? '#ffd93b' : (wm.isPlayer ? '#7bed9f' : '#8ec5ff');
+      ctx.font = 'bold 11px system-ui';
+      ctx.textAlign = 'left';
+      ctx.fillText('#' + (i+1), w - bw + 6, y);
+      ctx.fillStyle = wm.isPlayer ? '#7bed9f' : '#fff';
+      ctx.fillText(wm.name.substring(0, 12), w - bw + 30, y);
+      ctx.fillStyle = '#aab';
+      ctx.textAlign = 'right';
+      ctx.fillText(wm.segments.length, w - 22, y);
+    }
+    ctx.textAlign = 'left';
+  }
+
+  if (inGame){
+    const mmR = 80;
+    const mmX = 20 + mmR;
+    const mmY = h - mmR - 20;
+
+    ctx.fillStyle = 'rgba(4,8,18,0.7)';
+    ctx.beginPath();
+    ctx.arc(mmX, mmY, mmR, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(mmX, mmY, mmR - 3, 0, Math.PI*2);
+    ctx.clip();
+
+    const scale = (mmR*2 - 6) / Math.max(WORLD_W, WORLD_H);
+    const ox = mmX - mmR + 3;
+    const oy = mmY - mmR + 3;
+
+    ctx.fillStyle = 'rgba(30,45,80,0.55)';
+    ctx.fillRect(ox, oy, (mmR-3)*2, (mmR-3)*2);
+
+    for (let i = 0; i < worms.length; i++){
+      const wm = worms[i];
+      if (!wm.alive) continue;
+      const px = ox + wm.x * scale;
+      const py = oy + wm.y * scale;
+      if (wm === player){
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#7bed9f';
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI*2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = wm.color;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.6, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    if (gameState === 'spectator'){
+      const px = ox + camera.x * scale;
+      const py = oy + camera.y * scale;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, 6, 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(120,170,255,0.65)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(mmX, mmY, mmR, 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,100,100,0.9)';
+    ctx.font = 'bold 9px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('N', mmX, mmY - mmR + 12);
+    ctx.textAlign = 'left';
+  }
+
+  if (gameState === 'playing' && player){
+    const bx = boostBtn.x, by = boostBtn.y, r = boostBtn.r;
+    const active = player.boosting;
+
+    if (active){
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = '#ffb700';
+      ctx.beginPath();
+      ctx.arc(bx, by, r * 1.3, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI*2);
+    ctx.fillStyle = active ? 'rgba(255,200,80,0.85)' : 'rgba(255,200,80,0.22)';
+    ctx.fill();
+    ctx.strokeStyle = active ? '#ffd93b' : 'rgba(255,200,80,0.75)';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    ctx.fillStyle = active ? '#fff' : 'rgba(255,255,255,0.95)';
+    ctx.beginPath();
+    ctx.moveTo(bx+5, by-34);
+    ctx.lineTo(bx-17, by+2);
+    ctx.lineTo(bx-3, by+2);
+    ctx.lineTo(bx-7, by+30);
+    ctx.lineTo(bx+19, by-8);
+    ctx.lineTo(bx+5, by-8);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = 'bold 11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('TURBO', bx, by + r - 10);
+    ctx.textAlign = 'left';
+  }
+}
+
+function startGame(){
+  initAudio();
+  if (actx && actx.state === 'suspended') actx.resume();
+  startDrone();
+
+  worms = []; foods = []; particles = [];
+  foodGrid.clear();
+  steerTouches.clear(); boostTouches.clear(); spectatorDrag.clear();
+  shakeTime = 0;
+  document.getElementById('btn-exit-spec').style.display = 'none';
+  document.getElementById('spectator-badge').style.display = 'none';
+
+  const cx = WORLD_W/2, cy = WORLD_H/2;
+  player = new Worm(cx, cy, true, 25);
+  worms.push(player);
+
+  for (let i = 0; i < BOT_COUNT; i++){
+    const a = Math.random()*Math.PI*2;
+    const d = rand(400, 2800);
+    const bx = clamp(cx + Math.cos(a)*d, 100, WORLD_W-100);
+    const by = clamp(cy + Math.sin(a)*d, 100, WORLD_H-100);
+    worms.push(createBot(bx, by));
+  }
+
+  for (let i = 0; i < FOOD_COUNT; i++){
+    spawnFood(rand(50, WORLD_W-50), rand(50, WORLD_H-50));
+  }
+
+  camera.x = cx; camera.y = cy;
+  camera.zoom = camera.baseZoom;
+  gameState = 'playing';
+  hideAllOverlays();
+}
+
+function showDeathScreen(){
+  document.getElementById('final-score').textContent = Math.floor(player.score);
+  document.getElementById('final-length').textContent = player.segments.length;
+
+  const kl = document.getElementById('killer-line');
+  if (player.killerName){
+    kl.innerHTML = 'Te comió <b style="color:' + player.killerColor + '">' + player.killerName + '</b>';
+  } else {
+    kl.innerHTML = 'Te comió <b>el mundo</b>';
+  }
+  document.getElementById('ov-dead').classList.add('active');
+}
+
+function hideAllOverlays(){
+  document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
+}
+
+function enterSpectator(){
+  hideAllOverlays();
+  spectatorPos.x = camera.x;
+  spectatorPos.y = camera.y;
+  gameState = 'spectator';
+  document.getElementById('btn-exit-spec').style.display = 'block';
+  document.getElementById('spectator-badge').style.display = 'block';
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+
+function exitSpectator(){
+  document.getElementById('btn-exit-spec').style.display = 'none';
+  document.getElementById('spectator-badge').style.display = 'none';
+  spectatorDrag.clear();
+  showDeathScreen();
+}
+
+function steerToScreen(sx, sy){
+  if (!player || !player.alive) return;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const wx = (sx - w/2)/camera.zoom + camera.x;
+  const wy = (sy - h/2)/camera.zoom + camera.y;
+  const dx = wx - player.x, dy = wy - player.y;
+  if (dx*dx + dy*dy > 900){
+    player.targetAngle = Math.atan2(dy, dx);
+  }
+}
+function checkBoost(){
+  if (player && player.alive) player.boosting = boostTouches.size > 0;
+}
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  initAudio();
+  if (actx && actx.state === 'suspended') actx.resume();
+  const r = canvas.getBoundingClientRect();
+  for (const t of e.changedTouches){
+    const tx = t.clientX - r.left, ty = t.clientY - r.top;
+
+    if (gameState === 'spectator'){
+      spectatorDrag.set(t.identifier, {x: tx, y: ty});
+      continue;
+    }
+
+    const dx = tx - boostBtn.x, dy = ty - boostBtn.y;
+    if (dx*dx + dy*dy < (boostBtn.r + 35) * (boostBtn.r + 35)){
+      boostTouches.add(t.identifier);
+    } else {
+      steerTouches.add(t.identifier);
+      steerToScreen(tx, ty);
+    }
+  }
+  checkBoost();
+}, {passive: false});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  for (const t of e.changedTouches){
+    if (gameState === 'spectator'){
+      const start = spectatorDrag.get(t.identifier);
+      if (!start) continue;
+      const tx = t.clientX - r.left, ty = t.clientY - r.top;
+      const dx = tx - start.x, dy = ty - start.y;
+      spectatorPos.x = clamp(spectatorPos.x - dx / camera.zoom, 50, WORLD_W-50);
+      spectatorPos.y = clamp(spectatorPos.y - dy / camera.zoom, 50, WORLD_H-50);
+      start.x = tx; start.y = ty;
+      continue;
+    }
+    if (!steerTouches.has(t.identifier)) continue;
+    steerToScreen(t.clientX - r.left, t.clientY - r.top);
+  }
+}, {passive: false});
+
+function endTouch(e){
+  for (const t of e.changedTouches){
+    steerTouches.delete(t.identifier);
+    boostTouches.delete(t.identifier);
+    spectatorDrag.delete(t.identifier);
+  }
+  checkBoost();
+}
+canvas.addEventListener('touchend', endTouch, {passive: true});
+canvas.addEventListener('touchcancel', endTouch, {passive: true});
+
+canvas.addEventListener('mousemove', e => {
+  if (gameState === 'spectator') return;
+  if (gameState !== 'playing') return;
+  const r = canvas.getBoundingClientRect();
+  steerToScreen(e.clientX - r.left, e.clientY - r.top);
+});
+canvas.addEventListener('mousedown', e => {
+  if (gameState === 'playing' && player && e.button === 0) player.boosting = true;
+});
+canvas.addEventListener('mouseup', () => { if (player) player.boosting = false; });
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Shift' && player && gameState === 'playing') player.boosting = true;
+});
+window.addEventListener('keyup', e => {
+  if (e.key === 'Shift' && player) player.boosting = false;
+});
+
+document.getElementById('btn-play').addEventListener('click', startGame);
+document.getElementById('btn-restart').addEventListener('click', startGame);
+document.getElementById('btn-spectate').addEventListener('click', enterSpectator);
+document.getElementById('btn-exit-spec').addEventListener('click', exitSpectator);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && player) player.boosting = false;
+  if (document.hidden){
+    boostTouches.clear();
+    steerTouches.clear();
+    spectatorDrag.clear();
+  }
+});
+
+function loop(now){
+  if (!lastTime) lastTime = now;
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  if (dt > 0.05) dt = 0.05;
+  if (dt < 0) dt = 0;
+
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+resize();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
+
